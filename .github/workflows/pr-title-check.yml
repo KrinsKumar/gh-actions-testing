@@ -9,6 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check PR Title
+        id: title_check
         uses: actions/github-script@v7
         with:
           script: |
@@ -16,6 +17,7 @@ jobs:
             
             if (title !== "orange") { 
               core.setFailed(`Failed`)
-            } else {
-              core.setOutput(`Hey ${context.actor}, you are doing great!`);
             }
+      - name: Echo Actor Name
+        if: success()
+        run: echo "The PR was created by ${{ steps.title_check.outputs.actor }}" 
