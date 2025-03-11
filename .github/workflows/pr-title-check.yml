@@ -13,10 +13,15 @@ jobs:
         with:
           script: |
             const title = context.payload.pull_request.title;
-            // Modify this regex pattern according to your needs
-            const pattern = /^JIRA-\d+/;
+            // Pattern matches [OMNICAB-<numbers>] or [n/a] at start of title
+            const pattern = /^\[(OMNICAB-\d+|n\/a)\]/;
             
             if (!pattern.test(title)) {
               core.setFailed(`PR title "${title}" does not match the required pattern.
-                Title must start with one of: feat:, fix:, docs:, style:, refactor:, test:, chore:`);
-            } 
+                Title must start with either [OMNICAB-<number>] or [n/a]
+                Examples: 
+                - [OMNICAB-12345] A jira ticket number
+                - [n/a] No jira ticket number`);
+            } else {
+              core.success(`Hey ${context.actor}, you are doing great!`);
+            }
