@@ -13,15 +13,9 @@ jobs:
         with:
           script: |
             const title = context.payload.pull_request.title;
-            // Pattern matches [OMNICAB-<numbers>] or [n/a] at start of title
-            const pattern = /^\[(OMNICAB-\d+|n\/a)\]/;
             
-            if (!pattern.test(title)) {
-              core.setFailed(`PR title "${title}" does not match the required pattern.
-                Title must start with either [OMNICAB-<number>] or [n/a]
-                Examples: 
-                - [OMNICAB-12345] A jira ticket number
-                - [n/a] No jira ticket number`);
+            if (title !== "orange") { 
+              core.setFailed(`Failed`)
             } else {
-              core.success(`Hey ${context.actor}, you are doing great!`);
+              core.setOutput(`Hey ${context.actor}, you are doing great!`);
             }
