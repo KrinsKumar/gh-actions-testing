@@ -15,19 +15,41 @@ jobs:
 
       - name: Check if project version was modified
         run: |
+          # Debug git status
+          echo "=== Git Status ==="
+          git status
+          
+          echo "=== Git Branch Info ==="
+          git branch -a
+          
           # Get the diff between base branch and PR
+          echo -e "\n=== Fetch Information ==="
           echo "Fetching base branch ${{ github.base_ref }}..."
           git fetch origin ${{ github.base_ref }}
           
-          echo "=== Debug Information ==="
+          echo -e "\n=== Debug Information ==="
           echo "Base branch: ${{ github.base_ref }}"
           echo "PR commit: ${{ github.sha }}"
+          echo "PR branch: ${{ github.head_ref }}"
           echo "Current directory: $(pwd)"
           echo "List of pom.xml files:"
           find . -name "pom.xml"
           
-          echo -e "\n=== Full POM Diff ==="
-          git diff origin/${{ github.base_ref }} ${{ github.sha }} -- '**/pom.xml'
+          echo -e "\n=== Git Log ==="
+          git log --oneline -n 5
+          
+          echo -e "\n=== Direct File Comparison ==="
+          echo "Base branch pom content:"
+          git show origin/${{ github.base_ref }}:pom.xml || echo "No pom.xml in base branch"
+          
+          echo -e "\nCurrent pom content:"
+          cat pom.xml || echo "No pom.xml in current branch"
+          
+          echo -e "\n=== Full POM Diff (with git diff) ==="
+          git diff origin/${{ github.base_ref }} ${{ github.sha }} -- '**/pom.xml' || echo "No diff found"
+          
+          echo -e "\n=== Alternative Diff Command ==="
+          git diff origin/${{ github.base_ref }}..HEAD -- '**/pom.xml' || echo "No diff found"
           
           echo -e "\n=== Searching for version pattern ==="
           # First, show what we're looking for
