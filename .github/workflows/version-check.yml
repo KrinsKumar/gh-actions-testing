@@ -31,51 +31,43 @@ jobs:
           echo "Base branch: ${{ github.base_ref }}"
           echo "PR commit: ${{ github.sha }}"
           echo "PR branch: ${{ github.head_ref }}"
-          echo "Current directory: $(pwd)"
-          echo "List of pom.xml files:"
-          find . -name "pom.xml"
           
-          echo -e "\n=== Git Log ==="
-          git log --oneline -n 5
+          echo -e "\n=== POM Content Check ==="
+          echo "Current POM version line:"
+          grep "<version>" pom.xml || echo "No version tag found in current pom.xml"
           
-          echo -e "\n=== Direct File Comparison ==="
-          echo "Base branch pom content:"
-          git show origin/${{ github.base_ref }}:pom.xml || echo "No pom.xml in base branch"
+          echo -e "\n=== Diff Analysis ==="
+          DIFF_OUTPUT=$(git diff origin/${{ github.base_ref }} ${{ github.sha }} -- '**/pom.xml')
+          if [ -z "$DIFF_OUTPUT" ]; then
+            echo "No differences found in any pom.xml files"
+          else
+            echo "Found differences in pom.xml:"
+            echo "$DIFF_OUTPUT"
+          fi
           
-          echo -e "\nCurrent pom content:"
-          cat pom.xml || echo "No pom.xml in current branch"
+          echo -e "\n=== Version Pattern Search ==="
+          echo "Searching for version changes..."
+          # More lenient version search first
+          if echo "$DIFF_OUTPUT" | grep -A 2 -B 2 "<version>" > /dev/null; then
+            echo "Found version-related changes:"
+            echo "$DIFF_OUTPUT" | grep -A 2 -B 2 "<version>" || true
+          else
+            echo "No version-related changes found in diff"
+          fi
           
-          echo -e "\n=== Full POM Diff (with git diff) ==="
-          git diff origin/${{ github.base_ref }} ${{ github.sha }} -- '**/pom.xml' || echo "No diff found"
+          # Check for project version changes
+          PROJECT_VERSION_CHANGED=$(echo "$DIFF_OUTPUT" | grep -A 1 -B 1 "<version>" | grep -E "^[-+].*<version>" && echo "true" || echo "false")
           
-          echo -e "\n=== Alternative Diff Command ==="
-          git diff origin/${{ github.base_ref }}..HEAD -- '**/pom.xml' || echo "No diff found"
+          echo -e "\nProject version changed: $PROJECT_VERSION_CHANGED"
           
-          echo -e "\n=== Searching for version pattern ==="
-          # First, show what we're looking for
-          echo "Looking for pattern: artifactId followed by version changes"
-          DIFF_WITH_CONTEXT=$(git diff origin/${{ github.base_ref }} ${{ github.sha }} -- '**/pom.xml')
-          echo "Raw diff content around version tags:"
-          echo "$DIFF_WITH_CONTEXT" | grep -A 3 -B 3 "<version>"
-          
-          echo -e "\n=== Checking specific version pattern ==="
-          # Check if the project version tag was modified
-          VERSION_MODIFIED=$(echo "$DIFF_WITH_CONTEXT" | \
-            grep -Pzo '(?s)[-+]\s*<artifactId>[^<]+</artifactId>\s*[-+]\s*<version>[^<]+</version>' && \
-            echo "true" || echo "false")
-          
-          echo "Version modified: $VERSION_MODIFIED"
-          
-          if [ "$VERSION_MODIFIED" = "false" ]; then
+          if [ "$PROJECT_VERSION_CHANGED" = "false" ]; then
             echo -e "\n❌ No project version changes detected"
-            echo "This means either:"
-            echo "1. The version tag wasn't modified"
-            echo "2. The version change wasn't in the correct format (must be right after artifactId)"
-            echo "3. Both artifactId and version tags weren't modified together"
+            echo "Current POM content for reference:"
+            head -n 20 pom.xml
             echo "::error::Project version in pom.xml has not been updated. Please update the project version."
             exit 1
           else
             echo -e "\n✅ Project version change detected"
             echo "Version change details:"
-            echo "$DIFF_WITH_CONTEXT" | grep -A 2 -B 2 "<version>"
+            echo "$DIFF_OUTPUT" | grep -A 1 -B 1 "<version>"
           fi 
