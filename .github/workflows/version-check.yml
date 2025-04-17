@@ -13,17 +13,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check if version was modified
+      - name: Check if project version was modified
         run: |
           # Get the diff between base branch and PR
           git fetch origin ${{ github.base_ref }}
           
-          # Check if version tag was modified in any pom.xml file
-          VERSION_MODIFIED=$(git diff origin/${{ github.base_ref }} ${{ github.sha }} | grep -q "<version>" && echo "true" || echo "false")
+          # Check if the project version tag was modified in any pom.xml file
+          # This looks for version tag that comes right after the artifactId tag
+          VERSION_MODIFIED=$(git diff origin/${{ github.base_ref }} ${{ github.sha }} -- '**/pom.xml' | \
+            grep -Pzo '(?s)[-+]\s*<artifactId>[^<]+</artifactId>\s*[-+]\s*<version>[^<]+</version>' && \
+            echo "true" || echo "false")
           
           if [ "$VERSION_MODIFIED" = "false" ]; then
-            echo "::error::No version changes detected in any pom.xml file. Please update the version."
+            echo "::error::Project version in pom.xml has not been updated. Please update the project version."
             exit 1
           else
-            echo "Version change detected in pom.xml"
+            echo "Project version change detected in pom.xml"
           fi 
