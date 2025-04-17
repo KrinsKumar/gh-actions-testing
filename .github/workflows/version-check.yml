@@ -12,62 +12,48 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Check if project version was modified
         run: |
-          # Debug git status
-          echo "=== Git Status ==="
-          git status
+          echo "=== Git Setup ==="
+          git config --global --add safe.directory '*'
           
-          echo "=== Git Branch Info ==="
-          git branch -a
+          # Explicitly checkout and compare
+          echo -e "\n=== Explicit Branch Setup ==="
+          # Save current POM
+          cp pom.xml current_pom.xml
           
-          # Get the diff between base branch and PR
-          echo -e "\n=== Fetch Information ==="
-          echo "Fetching base branch ${{ github.base_ref }}..."
-          git fetch origin ${{ github.base_ref }}
+          # Get base branch version
+          git checkout origin/${{ github.base_ref }}
+          cp pom.xml base_pom.xml
           
-          echo -e "\n=== Debug Information ==="
-          echo "Base branch: ${{ github.base_ref }}"
-          echo "PR commit: ${{ github.sha }}"
-          echo "PR branch: ${{ github.head_ref }}"
+          # Return to PR branch
+          git checkout ${{ github.event.pull_request.head.sha }}
           
-          echo -e "\n=== POM Content Check ==="
-          echo "Current POM version line:"
-          grep "<version>" pom.xml || echo "No version tag found in current pom.xml"
+          echo -e "\n=== Version Comparison ==="
+          echo "Base version:"
+          grep "<version>" base_pom.xml
+          echo "Current version:"
+          grep "<version>" current_pom.xml
           
-          echo -e "\n=== Diff Analysis ==="
-          DIFF_OUTPUT=$(git diff origin/${{ github.base_ref }} ${{ github.sha }} -- '**/pom.xml')
-          if [ -z "$DIFF_OUTPUT" ]; then
-            echo "No differences found in any pom.xml files"
-          else
-            echo "Found differences in pom.xml:"
-            echo "$DIFF_OUTPUT"
+          echo -e "\n=== Direct File Comparison ==="
+          if ! diff base_pom.xml current_pom.xml > pom_changes.diff; then
+            echo "Found differences between POMs:"
+            cat pom_changes.diff
+            
+            # Check if project version changed
+            BASE_VERSION=$(grep -A 0 -B 0 "<version>" base_pom.xml | head -n 1)
+            CURRENT_VERSION=$(grep -A 0 -B 0 "<version>" current_pom.xml | head -n 1)
+            
+            if [ "$BASE_VERSION" != "$CURRENT_VERSION" ]; then
+              echo -e "\n✅ Project version change detected"
+              echo "From: $BASE_VERSION"
+              echo "To: $CURRENT_VERSION"
+              exit 0
+            fi
           fi
           
-          echo -e "\n=== Version Pattern Search ==="
-          echo "Searching for version changes..."
-          # More lenient version search first
-          if echo "$DIFF_OUTPUT" | grep -A 2 -B 2 "<version>" > /dev/null; then
-            echo "Found version-related changes:"
-            echo "$DIFF_OUTPUT" | grep -A 2 -B 2 "<version>" || true
-          else
-            echo "No version-related changes found in diff"
-          fi
-          
-          # Check for project version changes
-          PROJECT_VERSION_CHANGED=$(echo "$DIFF_OUTPUT" | grep -A 1 -B 1 "<version>" | grep -E "^[-+].*<version>" && echo "true" || echo "false")
-          
-          echo -e "\nProject version changed: $PROJECT_VERSION_CHANGED"
-          
-          if [ "$PROJECT_VERSION_CHANGED" = "false" ]; then
-            echo -e "\n❌ No project version changes detected"
-            echo "Current POM content for reference:"
-            head -n 20 pom.xml
-            echo "::error::Project version in pom.xml has not been updated. Please update the project version."
-            exit 1
-          else
-            echo -e "\n✅ Project version change detected"
-            echo "Version change details:"
-            echo "$DIFF_OUTPUT" | grep -A 1 -B 1 "<version>"
-          fi 
+          echo -e "\n❌ No project version changes detected"
+          echo "::error::Project version in pom.xml has not been updated. Please update the project version."
+          exit 1 
