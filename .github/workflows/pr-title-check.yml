@@ -9,14 +9,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check PR Title
+        id: title_check
         uses: actions/github-script@v7
         with:
           script: |
             const title = context.payload.pull_request.title;
-            // Modify this regex pattern according to your needs
-            const pattern = /^JIRA-\d+/;
             
-            if (!pattern.test(title)) {
-              core.setFailed(`PR title "${title}" does not match the required pattern.
-                Title must start with one of: feat:, fix:, docs:, style:, refactor:, test:, chore:`);
-            } 
+            if (title !== "orange") { 
+              core.setFailed(`Failed`)
+            }
+      - name: Echo Actor Name
+        if: success()
+        run: echo "The PR was created by ${{ steps.title_check.outputs.actor }}" 

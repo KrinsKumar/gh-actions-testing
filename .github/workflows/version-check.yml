@@ -1,0 +1,43 @@
+name: POM Version Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '**/pom.xml'
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Check if version was modified
+        run: |
+          # Get the list of modified files in the PR
+          FILES_CHANGED=$(git diff --name-only origin/${{ github.base_ref }} ${{ github.sha }} | grep "pom.xml" || true)
+          
+          if [ -z "$FILES_CHANGED" ]; then
+            echo "No pom.xml files were modified"
+            exit 0
+          fi
+          
+          # Check if version tag was modified in any of the changed pom.xml files
+          VERSION_MODIFIED=false
+          for file in $FILES_CHANGED; do
+            if git diff origin/${{ github.base_ref }} ${{ github.sha }} $file | grep -q "<version>"; then
+              echo "Version was modified in $file"
+              VERSION_MODIFIED=true
+              break
+            fi
+          done
+          
+          if [ "$VERSION_MODIFIED" = false ]; then
+            echo "::error::No version changes detected in any pom.xml file. Please update the version."
+            exit 1
+          else
+            echo "Version change detected in pom.xml"
+          fi 
