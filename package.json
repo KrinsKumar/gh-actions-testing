@@ -1,0 +1,31 @@
+{
+  "name": "version-check-test",
+  "version": "1.0.0",
+  "description": "A test project for version checking GitHub Action",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/gh-actions-testing.git"
+  },
+  "keywords": [
+    "test",
+    "github-actions",
+    "version-check"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/yourusername/gh-actions-testing/issues"
+  },
+  "homepage": "https://github.com/yourusername/gh-actions-testing#readme",
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  }
+} 
