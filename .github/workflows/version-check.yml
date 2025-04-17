@@ -16,7 +16,6 @@ jobs:
 
       - name: Check if project version was modified
         run: |
-          echo "=== Git Setup ==="
           git config --global --add safe.directory '*'
           
           # Explicitly checkout and compare
