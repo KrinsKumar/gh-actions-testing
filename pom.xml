@@ -6,7 +6,7 @@
 
     <groupId>com.example</groupId>
     <artifactId>test-project</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <packaging>pom</packaging>
 
     <name>Test Project</name>
