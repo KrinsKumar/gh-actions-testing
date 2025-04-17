@@ -16,17 +16,44 @@ jobs:
       - name: Check if project version was modified
         run: |
           # Get the diff between base branch and PR
+          echo "Fetching base branch ${{ github.base_ref }}..."
           git fetch origin ${{ github.base_ref }}
           
-          # Check if the project version tag was modified in any pom.xml file
-          # This looks for version tag that comes right after the artifactId tag
-          VERSION_MODIFIED=$(git diff origin/${{ github.base_ref }} ${{ github.sha }} -- '**/pom.xml' | \
+          echo "=== Debug Information ==="
+          echo "Base branch: ${{ github.base_ref }}"
+          echo "PR commit: ${{ github.sha }}"
+          echo "Current directory: $(pwd)"
+          echo "List of pom.xml files:"
+          find . -name "pom.xml"
+          
+          echo -e "\n=== Full POM Diff ==="
+          git diff origin/${{ github.base_ref }} ${{ github.sha }} -- '**/pom.xml'
+          
+          echo -e "\n=== Searching for version pattern ==="
+          # First, show what we're looking for
+          echo "Looking for pattern: artifactId followed by version changes"
+          DIFF_WITH_CONTEXT=$(git diff origin/${{ github.base_ref }} ${{ github.sha }} -- '**/pom.xml')
+          echo "Raw diff content around version tags:"
+          echo "$DIFF_WITH_CONTEXT" | grep -A 3 -B 3 "<version>"
+          
+          echo -e "\n=== Checking specific version pattern ==="
+          # Check if the project version tag was modified
+          VERSION_MODIFIED=$(echo "$DIFF_WITH_CONTEXT" | \
             grep -Pzo '(?s)[-+]\s*<artifactId>[^<]+</artifactId>\s*[-+]\s*<version>[^<]+</version>' && \
             echo "true" || echo "false")
           
+          echo "Version modified: $VERSION_MODIFIED"
+          
           if [ "$VERSION_MODIFIED" = "false" ]; then
+            echo -e "\n❌ No project version changes detected"
+            echo "This means either:"
+            echo "1. The version tag wasn't modified"
+            echo "2. The version change wasn't in the correct format (must be right after artifactId)"
+            echo "3. Both artifactId and version tags weren't modified together"
             echo "::error::Project version in pom.xml has not been updated. Please update the project version."
             exit 1
           else
-            echo "Project version change detected in pom.xml"
+            echo -e "\n✅ Project version change detected"
+            echo "Version change details:"
+            echo "$DIFF_WITH_CONTEXT" | grep -A 2 -B 2 "<version>"
           fi 
