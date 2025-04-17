@@ -1,4 +1,4 @@
-name: POM Version Check
+name: Version Check
 
 on:
   pull_request:
@@ -16,44 +16,81 @@ jobs:
 
       - name: Check if project version was modified
         run: |
-          echo "=== Git Setup ==="
           git config --global --add safe.directory '*'
+          
+          # Function to check version in package.json
+          check_npm_version() {
+            if [ -f "$1" ]; then
+              grep '"version":' "$1" | cut -d'"' -f4
+            fi
+          }
+          
+          # Function to check version in pom.xml
+          check_maven_version() {
+            if [ -f "$1" ]; then
+              grep "<version>" "$1" | head -n 1 | sed 's/.*<version>\(.*\)<\/version>.*/\1/'
+            fi
+          }
           
           # Explicitly checkout and compare
           echo -e "\n=== Explicit Branch Setup ==="
-          # Save current POM
-          cp pom.xml current_pom.xml
+          # Save current versions
+          for file in pom.xml package.json; do
+            if [ -f "$file" ]; then
+              cp "$file" "current_$file"
+            fi
+          done
           
-          # Get base branch version
+          # Get base branch versions
           git checkout origin/${{ github.base_ref }}
-          cp pom.xml base_pom.xml
+          for file in pom.xml package.json; do
+            if [ -f "$file" ]; then
+              cp "$file" "base_$file"
+            fi
+          done
           
           # Return to PR branch
           git checkout ${{ github.event.pull_request.head.sha }}
           
-          echo -e "\n=== Version Comparison ==="
-          echo "Base version:"
-          grep "<version>" base_pom.xml
-          echo "Current version:"
-          grep "<version>" current_pom.xml
+          VERSION_CHANGED=false
           
-          echo -e "\n=== Direct File Comparison ==="
-          if ! diff base_pom.xml current_pom.xml > pom_changes.diff; then
-            echo "Found differences between POMs:"
-            cat pom_changes.diff
+          echo -e "\n=== Version Comparison ==="
+          
+          # Check Maven version if pom.xml exists
+          if [ -f "base_pom.xml" ] && [ -f "current_pom.xml" ]; then
+            echo "Maven project detected"
+            BASE_MAVEN_VERSION=$(check_maven_version "base_pom.xml")
+            CURRENT_MAVEN_VERSION=$(check_maven_version "current_pom.xml")
             
-            # Check if project version changed
-            BASE_VERSION=$(grep -A 0 -B 0 "<version>" base_pom.xml | head -n 1)
-            CURRENT_VERSION=$(grep -A 0 -B 0 "<version>" current_pom.xml | head -n 1)
+            echo "Maven base version: $BASE_MAVEN_VERSION"
+            echo "Maven current version: $CURRENT_MAVEN_VERSION"
             
-            if [ "$BASE_VERSION" != "$CURRENT_VERSION" ]; then
-              echo -e "\n✅ Project version change detected"
-              echo "From: $BASE_VERSION"
-              echo "To: $CURRENT_VERSION"
-              exit 0
+            if [ "$BASE_MAVEN_VERSION" != "$CURRENT_MAVEN_VERSION" ]; then
+              VERSION_CHANGED=true
+              echo "✅ Maven version changed from $BASE_MAVEN_VERSION to $CURRENT_MAVEN_VERSION"
             fi
           fi
           
-          echo -e "\n❌ No project version changes detected"
-          echo "::error::Project version in pom.xml has not been updated. Please update the project version."
-          exit 1 
+          # Check NPM version if package.json exists
+          if [ -f "base_package.json" ] && [ -f "current_package.json" ]; then
+            echo -e "\nNode.js project detected"
+            BASE_NPM_VERSION=$(check_npm_version "base_package.json")
+            CURRENT_NPM_VERSION=$(check_npm_version "current_package.json")
+            
+            echo "NPM base version: $BASE_NPM_VERSION"
+            echo "NPM current version: $CURRENT_NPM_VERSION"
+            
+            if [ "$BASE_NPM_VERSION" != "$CURRENT_NPM_VERSION" ]; then
+              VERSION_CHANGED=true
+              echo "✅ NPM version changed from $BASE_NPM_VERSION to $CURRENT_NPM_VERSION"
+            fi
+          fi
+          
+          if [ "$VERSION_CHANGED" = false ]; then
+            echo -e "\n❌ No version changes detected"
+            echo "::error::Project version has not been updated. Please update the version in pom.xml or package.json"
+            exit 1
+          else
+            echo -e "\n✅ Version change detected"
+            exit 0
+          fi 
